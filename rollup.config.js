@@ -5,7 +5,7 @@ import pkg from "./package.json";
 
 export default [
   {
-    input: "src/main.js",
+    input: "src/browser.js",
     output: {
       name: "jintrospector",
       file: pkg.browser,
@@ -20,7 +20,7 @@ export default [
     ]
   },
   {
-    input: "src/main.js",
+    input: "src/node.js",
     external: ["ms"],
     output: [
       { file: pkg.main, format: "cjs" },
