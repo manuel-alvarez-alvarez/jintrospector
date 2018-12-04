@@ -1,4 +1,5 @@
-import { LoggerFactory, ALL, Level } from "../src/log.js";
+import { LoggerFactory, PatternAppender, Level } from "../src/log.js";
+import { ConsoleAppender } from "../src/log";
 
 describe("The log facility works", () => {
   const logger = LoggerFactory.getRootLogger();
@@ -7,7 +8,9 @@ describe("The log facility works", () => {
   const messages = [];
 
   beforeEach(() => {
-    logger.appender = message => messages.push(message);
+    logger.appender = new PatternAppender({
+      append: data => messages.push(data.message)
+    });
   });
 
   afterEach(() => {
@@ -20,6 +23,23 @@ describe("The log facility works", () => {
 
     logger.log(Level.INFO, "Hello!");
     expect(messages.length).toEqual(0);
+  });
+
+  test("The console appender just works", () => {
+    new ConsoleAppender().append({ message: "Hello!" });
+  });
+
+  test("The pattern appender just works", () => {
+    const items = [];
+    new PatternAppender({ append: data => items.push(data.message) }).append({
+      message: "Hello!",
+      logger: logger,
+      level: Level.ERROR
+    });
+
+    expect(items.length).toEqual(1);
+    expect(items[0]).toContain("Hello!");
+    expect(items[0]).toContain(Level.ERROR.name);
   });
 
   test("The logger will log statements to the chosen appender", () => {
@@ -77,7 +97,7 @@ describe("The log facility works", () => {
 
   test("The new loggers can change its own pattern", () => {
     const customLogger = LoggerFactory.getLogger("custom");
-    customLogger.pattern = "%message";
+    customLogger.appender.pattern = "${message}";
     customLogger.level = Level.ERROR;
     customLogger.log(Level.ERROR, "Hello {1} {0}!", "Manuel", "Mr.");
     expect(messages.length).toEqual(1);
@@ -87,8 +107,10 @@ describe("The log facility works", () => {
   test("The new loggers can change its own appender", () => {
     const customLogger = LoggerFactory.getLogger("custom");
     const otherMessages = [];
-    customLogger.level = ALL;
-    customLogger.appender = message => otherMessages.push(message);
+    customLogger.level = Level.ALL;
+    customLogger.appender = new PatternAppender({
+      append: data => otherMessages.push(data.message)
+    });
     customLogger.log(Level.ERROR, "Hello {1} {0}!", "Manuel", "Mr.");
     expect(otherMessages.length).toEqual(1);
     otherMessages.length = 0;
