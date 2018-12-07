@@ -1,11 +1,10 @@
 export class Predicate {
-
   constructor(method) {
     this.method = method;
   }
 
   test(t) {
-    return method.call(this, t);
+    return this.method.call(this, t);
   }
 
   static none() {
@@ -18,5 +17,13 @@ export class Predicate {
 
   not() {
     return new Predicate(t => !this.test(t));
+  }
+
+  and(predicate) {
+    return new Predicate(t => this.test(t) && predicate.test(t));
+  }
+
+  or(predicate) {
+    return new Predicate(t => this.test(t) || predicate.test(t));
   }
 }

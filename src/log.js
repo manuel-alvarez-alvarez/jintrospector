@@ -47,7 +47,7 @@ export class ConsoleAppender {
 export class PatternAppender {
   constructor(
     appender,
-    pattern = "${level | justify 5} (${date | iso}) [${name | justify -10}]: ${message}"
+    pattern = "${level | justify 5} (${date | iso}) [${name | justify -32}]: ${message}"
   ) {
     this.appender = appender;
     this._pattern = pattern;
@@ -59,7 +59,7 @@ export class PatternAppender {
       this.pattern,
       match => {
         const method = match[1];
-        let item = this[method].call(this, data);
+        let item = this[method](data);
         if (match[2]) {
           match[2]
             .split("|")
@@ -74,7 +74,7 @@ export class PatternAppender {
         return item;
       }
     );
-    return this.appender.append.call(this, data);
+    return this.appender.append(data);
   }
 
   get pattern() {
