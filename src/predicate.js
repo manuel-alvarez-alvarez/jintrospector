@@ -27,3 +27,18 @@ export class Predicate {
     return new Predicate(t => this.test(t) || predicate.test(t));
   }
 }
+
+export class TypePredicates {
+
+  static typeName(string) {
+    return new Predicate(type => type.name === string);
+  }
+}
+
+
+export class MethodPredicates {
+
+  static methodName(string) {
+    return new Predicate(method => method.name === string);
+  }
+}

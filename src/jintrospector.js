@@ -1,213 +1,71 @@
-import { Predicate } from "./predicate.js";
-import { LoggerFactory } from "./log.js";
+import {Predicate} from "./predicate.js";
+import {LoggerFactory} from "./log.js";
+import {ObjectVisitor, Options} from "./visitor";
 
 class Type {
-  constructor(kind, name) {
-    this._kind = kind;
-    this._name = name;
-  }
-
-  get name() {
-    return this._name;
-  }
-
-  get kind() {
-    return this._kind;
-  }
-
-  toString() {
-    return `Type[kind=${this.kind}, name=${this.name}]`;
+  constructor(type, name) {
+    this.type = type;
+    this.name = name;
   }
 }
 
 export class Method {
   constructor(owner, name) {
-    this._owner = owner;
-    this._name = name;
-  }
-
-  get name() {
-    return this._name;
-  }
-
-  get owner() {
-    return this._owner;
-  }
-
-  toString() {
-    return `Method[owner=${this.owner}, name=${this.name}]`;
-  }
-}
-
-class Frame {
-  constructor(target, owner = null, property = null) {
-    this._target = target;
-    this._owner = owner;
-    this._property = property;
-  }
-
-  get target() {
-    return this._target;
-  }
-
-  get owner() {
-    return this._owner;
-  }
-
-  get property() {
-    return this._property;
-  }
-}
-
-class Context {
-  constructor() {
-    this.stack = [];
-  }
-
-  push(frame) {
-    this.stack.push(frame);
-  }
-
-  pop() {
-    return this.stack.pop();
-  }
-
-  peek() {
-    return this.stack[this.stack.length - 1];
+    this.owner = owner;
+    this.name = name;
   }
 }
 
 class Aop {
-  constructor(object, typePredicate, methodPredicate) {
+  constructor(object, typePredicate, replacements) {
     this.object = object;
     this.typePredicate = typePredicate;
-    this.methodPredicate = methodPredicate;
+    this.replacements = replacements;
   }
 
   instrument() {
-    const context = new Context();
-    context.push(new Frame(this.object));
-    return this._visit(context);
+    const visitor = new ObjectVisitor();
+    visitor.visit(this.object, new Options(this._visitObject.bind(this), this._visitFunction.bind(this)));
+    return this.object;
   }
 
-  _visit(context) {
-    const frame = context.peek();
-    try {
-      if (Aop._getOrCreateHolder(frame.target).visited) {
-        return target;
-      }
-      let target = frame.target;
-      const type = Aop._getType(target);
-      let visit;
-      if (
-        type.kind === "function" ||
-        (type.kind === "object" && type.name === "Function")
-      ) {
-        visit = this._visitFunction;
-      } else if (type.kind === "object") {
-        visit = this._visitObject;
-      }
-      if (visit) {
-        const holder = Aop._getOrCreateHolder(target);
-        if (!holder.visited) {
-          holder.visited = true;
-          target = visit.call(this, context);
-        }
-      } else {
-        Aop.LOGGER.debug(
-          '_visit: "{} with type {}" not a function or object',
-          target,
-          this._getType(target)
-        );
-      }
-      return target;
-    } finally {
-      context.pop();
-    }
-  }
-
-  _visitObject(context) {
-    const frame = context.peek();
-    const target = frame.target;
+  _visitObject(target) {
     const type = Aop._getType(target);
-    Aop.LOGGER.debug(
-      '_visitObject: visiting "{}" of type "{}" owned by "{}"',
-      frame.property,
-      type,
-      frame.owner
-    );
-    if (!this.typePredicate.test(type)) {
-      Aop.LOGGER.debug("_visitObject: excluded");
-      return target;
-    }
-    const descriptors = Object.getOwnPropertyDescriptors(target);
-    Object.keys(descriptors)
-      .filter(key => key !== "__jinstrospector__")
-      .forEach(key => {
-        const property = descriptors[key];
-        Aop.LOGGER.debug(
-          '_visitObject: "{}" is writable? "{}"',
-          key,
-          property.writable
-        );
-        if (property.writable) {
-          context.push(new Frame(property.value, type, key));
-          target[key] = this._visit(context);
-        }
-      });
-    return target;
+    Aop.LOGGER.debug('_visitObject: "%j"', type);
+    return this.typePredicate.test(type);
   }
 
-  _visitFunction(context) {
-    const frame = context.peek();
-    const target = frame.target;
-    const method = new Method(frame.owner, frame.property);
-    if (!this.methodPredicate.test(method)) {
-      Aop.LOGGER.debug("_visitFunction: excluded");
-      return target;
-    }
-    Aop.LOGGER.debug(
-      '_visitFunction: visiting "{}" "{}"',
-      method,
-      typeof target
-    );
-    return target;
-  }
-
-  static _getOrCreateHolder(target) {
-    let holder = target.__jinstrospector__;
-    if (!holder) {
-      holder = { visited: false };
-      target.__jinstrospector__ = holder;
-    }
-    return holder;
+  _visitFunction(fn, owner, name) {
+    const ownerType = Aop._getType(owner);
+    const method = new Method(ownerType, name);
+    Aop.LOGGER.debug('_visitFunction: "%j"', method);
+    this.replacements.forEach((replacement, predicate) => {
+      if (predicate.test(method)) {
+        owner[name] = replacement;
+      }
+    });
   }
 
   static _getType(object) {
-    let name, kind;
-    if (object === undefined) {
-      kind = name = "undefined";
-    } else if (object === null) {
-      kind = name = "null";
+    let classname;
+    if (object === null) {
+      classname = 'null';
+    } else if (object === undefined) {
+      classname = 'undefined';
     } else {
-      const prototype = Object.prototype.toString.call(object).split(" ");
-      kind = prototype[0].substring(1);
-      name = prototype[1].substring(0, prototype[1].length - 1);
-      if (name === "Number" && isNaN(object)) {
-        name = "NaN";
-      }
+      classname = object.constructor ? object.constructor.name : null;
     }
-    return new Type(kind, name);
+    return new Type(typeof object, classname);
   }
 }
 
-Aop.LOGGER = LoggerFactory.getLogger("jintrospector.AOP");
+Aop.LOGGER = LoggerFactory.getLogger("jintrospector.aop");
 
 class Ast {
-  constructor(code, typePredicate, methodPredicate) {
+  constructor(code, typePredicate, remplacements) {
     this.code = code;
     this.typePredicate = typePredicate;
-    this.methodPredicate = methodPredicate;
+    this.remplacements = remplacements;
   }
 
   instrument() {
@@ -215,20 +73,22 @@ class Ast {
   }
 }
 
-Ast.LOGGER = LoggerFactory.getLogger("jintrospector.AST");
+Ast.LOGGER = LoggerFactory.getLogger("jintrospector.ast");
 
 class Builder {
   constructor() {
     this.typePredicate = Predicate.all();
-    this.methodPredicate = Predicate.all();
+    this.replacements = new Map();
   }
 
   includeTypes(typePredicate) {
     this.typePredicate = typePredicate;
+    return this;
   }
 
-  includeMethods(methodPredicate) {
-    this.methodPredicate = methodPredicate;
+  replaceMethods(methodPredicate, replacement) {
+    this.replacements.set(methodPredicate, replacement);
+    return this;
   }
 }
 
@@ -239,11 +99,7 @@ class AopBuilder extends Builder {
   }
 
   instrument() {
-    return new Aop(
-      this.object,
-      this.typePredicate,
-      this.methodPredicate
-    ).instrument();
+    return new Aop(this.object, this.typePredicate, this.replacements).instrument();
   }
 }
 
@@ -254,11 +110,7 @@ class AstBuilder extends Builder {
   }
 
   instrument() {
-    return new Ast(
-      this.code,
-      this.typePredicate,
-      this.methodPredicate
-    ).instrument();
+    return new Ast(this.code, this.typePredicate, this.methodPredicate).instrument();
   }
 }
 

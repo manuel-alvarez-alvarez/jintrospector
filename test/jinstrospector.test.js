@@ -1,7 +1,6 @@
 import jinstrospector from "../src/jintrospector.js";
 import { LoggerFactory, Level } from "../src/log";
-
-LoggerFactory.getRootLogger().level = Level.ALL;
+import {MethodPredicates, StringPredicates, TypePredicates} from "../src/predicate";
 
 describe("Creation of the interceptor", () => {
   test("The exported library is not null", () => {
@@ -13,26 +12,26 @@ describe("Creation of the interceptor", () => {
   });
 
   test("Instrument a program works", () => {
-    expect(
-      jinstrospector
-        .forCode("function sum(a, b) { return a = b }; sum(1, 2);")
-        .instrument()
-    ).not.toBeNull();
+    expect(jinstrospector.forCode("function sum(a, b) { return a = b }; sum(1, 2);").instrument()).not.toBeNull();
   });
 });
 
 describe("AOP interceptor", () => {
-  test("The instrumenter returns a proxy with the same methods", () => {
-    let object = {
-      sayHello: function() {
-        return "Hello!!!";
-      }
+
+
+
+  test("The instrumenter returns an object with the same methods", () => {
+    function TestObject() {}
+    TestObject.prototype.sayHello = function() {
+      return "Hello!!!";
     };
-    expect(
-      jinstrospector
-        .forObject(object)
-        .instrument()
-        .sayHello()
-    ).toEqual("Hello!!!");
+
+    const object = new TestObject();
+    const instrumented = jinstrospector.forObject(object)
+      .includeTypes(TypePredicates.typeName('TestObject'))
+      .replaceMethods(MethodPredicates.methodName('sayHello'), () => 'Goodbye!!!')
+      .instrument();
+
+    expect(instrumented.sayHello()).toEqual("Goodbye!!!");
   });
 });

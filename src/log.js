@@ -45,35 +45,28 @@ export class ConsoleAppender {
 }
 
 export class PatternAppender {
-  constructor(
-    appender,
-    pattern = "${level | justify 5} (${date | iso}) [${name | justify -32}]: ${message}"
-  ) {
+  constructor(appender, pattern = "${level | justify 5} (${date | iso}) [${name | justify -32}]: ${message}") {
     this.appender = appender;
     this._pattern = pattern;
   }
 
   append(data) {
-    data.message = digestRegexp(
-      /\$\{\s*(\w+)(?:\s*\|\s*([^\}]+))*\s*\}/g,
-      this.pattern,
-      match => {
-        const method = match[1];
-        let item = this[method](data);
-        if (match[2]) {
-          match[2]
-            .split("|")
-            .map(it => it.trim())
-            .forEach(pipe => {
-              const pipeArguments = pipe.split(" ").map(it => it.trim());
-              const pipeMethod = pipeArguments[0];
-              pipeArguments[0] = item;
-              item = this[pipeMethod].apply(this, pipeArguments);
-            });
-        }
-        return item;
+    data.message = digestRegexp(/\$\{\s*(\w+)(?:\s*\|\s*([^\}]+))*\s*\}/g, this.pattern, match => {
+      const method = match[1];
+      let item = this[method](data);
+      if (match[2]) {
+        match[2]
+          .split("|")
+          .map(it => it.trim())
+          .forEach(pipe => {
+            const pipeArguments = pipe.split(" ").map(it => it.trim());
+            const pipeMethod = pipeArguments[0];
+            pipeArguments[0] = item;
+            item = this[pipeMethod].apply(this, pipeArguments);
+          });
       }
-    );
+      return item;
+    });
     return this.appender.append(data);
   }
 
@@ -128,17 +121,26 @@ export class Logger {
       let finalMessage = message;
       if (args.length > 0) {
         let argIndex = 0;
-        finalMessage = digestRegexp(
-          /\{(\d*)\}/g,
-          message,
-          match => args[match[1].length > 0 ? parseInt(match[1]) : argIndex++]
-        );
+        finalMessage = digestRegexp(/\%(\d*)([s|j])/g, message, match => {
+          const index = match[1].length > 0 ? parseInt(match[1]) : argIndex++;
+          const value = args[index];
+          if (value === null) {
+            return 'null';
+          } else if (value === undefined) {
+            return 'undefined';
+          }
+          const format = match[2];
+          switch (format) {
+            case 's':
+              return value.toString();
+            case 'j':
+              return JSON.stringify(value);
+            default:
+              throw new Error(`Pattern "${format}" not recognized`);
+          }
+        });
       }
-      this.appender.append({
-        message: finalMessage,
-        level: level,
-        logger: this
-      });
+      this.appender.append({message: finalMessage, level: level, logger: this});
     }
   }
 
@@ -185,20 +187,16 @@ export class Logger {
   }
 }
 
-export class LoggerFactory {}
+export class LoggerFactory {
+}
 
 LoggerFactory._loggers = {
-  "": new Logger(
-    null,
-    "root",
-    Level.ERROR,
-    new PatternAppender(new ConsoleAppender())
-  )
+  "": new Logger(null, "root", Level.ERROR, new PatternAppender(new ConsoleAppender()))
 };
-LoggerFactory.getRootLogger = function() {
+LoggerFactory.getRootLogger = function () {
   return LoggerFactory._loggers[""];
 };
-LoggerFactory.getLogger = function(name) {
+LoggerFactory.getLogger = function (name) {
   let logger = LoggerFactory._loggers[name];
   if (!logger) {
     logger = new Logger(LoggerFactory._loggers[""], name);
