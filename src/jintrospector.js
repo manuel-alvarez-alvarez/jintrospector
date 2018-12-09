@@ -9,11 +9,34 @@ class Type {
   }
 }
 
-export class Method {
+class Method {
   constructor(owner, name) {
     this.owner = owner;
     this.name = name;
   }
+}
+
+function makeFunction(arity, fn) {
+  const params = [];
+  for (let i = 0; i < arity; i++) {
+    params.push('_' + i);
+  }
+  return new Function(
+    'fn',
+    'return function arity' + arity + ' (' + params.join(', ') + ') { return fn.apply(this, arguments); }'
+  );
+}
+
+function getType(object) {
+  let classname;
+  if (object === null) {
+    classname = 'null';
+  } else if (object === undefined) {
+    classname = 'undefined';
+  } else {
+    classname = object.constructor ? object.constructor.name : null;
+  }
+  return new Type(typeof object, classname);
 }
 
 class Aop {
@@ -30,32 +53,20 @@ class Aop {
   }
 
   _visitObject(target) {
-    const type = Aop._getType(target);
+    const type = getType(target);
     Aop.LOGGER.debug('_visitObject: "%j"', type);
     return this.typePredicate.test(type);
   }
 
-  _visitFunction(fn, owner, name) {
-    const ownerType = Aop._getType(owner);
+  _visitFunction(target, owner, name) {
+    const ownerType = getType(owner);
     const method = new Method(ownerType, name);
     Aop.LOGGER.debug('_visitFunction: "%j"', method);
     this.replacements.forEach((replacement, predicate) => {
       if (predicate.test(method)) {
-        owner[name] = replacement;
+        owner[name] =  makeFunction(target.length, () => replacement.call(this, new Invocation(target, arguments)));
       }
     });
-  }
-
-  static _getType(object) {
-    let classname;
-    if (object === null) {
-      classname = 'null';
-    } else if (object === undefined) {
-      classname = 'undefined';
-    } else {
-      classname = object.constructor ? object.constructor.name : null;
-    }
-    return new Type(typeof object, classname);
   }
 }
 
@@ -111,6 +122,17 @@ class AstBuilder extends Builder {
 
   instrument() {
     return new Ast(this.code, this.typePredicate, this.methodPredicate).instrument();
+  }
+}
+
+class Invocation {
+  constructor(method, args) {
+    this.method = method;
+    this.args = args;
+  }
+
+  proceed() {
+    return this.method.apply(this, this.args);
   }
 }
 

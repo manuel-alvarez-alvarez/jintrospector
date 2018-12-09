@@ -1,5 +1,5 @@
 import jinstrospector from "../src/jintrospector.js";
-import { LoggerFactory, Level } from "../src/log";
+import {LoggerFactory, Level} from "../src/log";
 import {MethodPredicates, StringPredicates, TypePredicates} from "../src/predicate";
 
 describe("Creation of the interceptor", () => {
@@ -19,19 +19,20 @@ describe("Creation of the interceptor", () => {
 describe("AOP interceptor", () => {
 
 
-
   test("The instrumenter returns an object with the same methods", () => {
-    function TestObject() {}
-    TestObject.prototype.sayHello = function() {
-      return "Hello!!!";
+    function TestObject() {
+    }
+
+    TestObject.prototype.sayHello = function () {
+      return "Hello";
     };
 
     const object = new TestObject();
     const instrumented = jinstrospector.forObject(object)
       .includeTypes(TypePredicates.typeName('TestObject'))
-      .replaceMethods(MethodPredicates.methodName('sayHello'), () => 'Goodbye!!!')
+      .replaceMethods(MethodPredicates.methodName('sayHello'), invocation => invocation.proceed() + ' Manuel')
       .instrument();
 
-    expect(instrumented.sayHello()).toEqual("Goodbye!!!");
+    expect(instrumented.sayHello()).toEqual("Hello Manuel");
   });
 });
