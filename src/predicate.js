@@ -28,17 +28,17 @@ export class Predicate {
   }
 }
 
-export class TypePredicates {
+export class Types {
 
-  static typeName(string) {
+  static name(string) {
     return new Predicate(type => type.name === string);
   }
 }
 
 
-export class MethodPredicates {
+export class Methods {
 
-  static methodName(string) {
+  static name(string) {
     return new Predicate(method => method.name === string);
   }
 }

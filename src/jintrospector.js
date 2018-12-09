@@ -23,8 +23,8 @@ function makeFunction(arity, fn) {
   }
   return new Function(
     'fn',
-    'return function arity' + arity + ' (' + params.join(', ') + ') { return fn.apply(this, arguments); }'
-  );
+    'return function (' + params.join(', ') + ') { return fn.apply(this, arguments); }'
+  )(fn);
 }
 
 function getType(object) {
@@ -49,7 +49,6 @@ class Aop {
   instrument() {
     const visitor = new ObjectVisitor();
     visitor.visit(this.object, new Options(this._visitObject.bind(this), this._visitFunction.bind(this)));
-    return this.object;
   }
 
   _visitObject(target) {
@@ -64,7 +63,9 @@ class Aop {
     Aop.LOGGER.debug('_visitFunction: "%j"', method);
     this.replacements.forEach((replacement, predicate) => {
       if (predicate.test(method)) {
-        owner[name] =  makeFunction(target.length, () => replacement.call(this, new Invocation(target, arguments)));
+        owner[name] = makeFunction(target.length, function () {
+          return replacement.call(this, new Invocation(target, arguments, this))
+        });
       }
     });
   }
@@ -80,7 +81,7 @@ class Ast {
   }
 
   instrument() {
-    return this.code;
+
   }
 }
 
@@ -89,17 +90,22 @@ Ast.LOGGER = LoggerFactory.getLogger("jintrospector.ast");
 class Builder {
   constructor() {
     this.typePredicate = Predicate.all();
-    this.replacements = new Map();
+    this.methodPredicate = Predicate.all();
+    this.replacement = null;
   }
 
-  includeTypes(typePredicate) {
+  types(typePredicate) {
     this.typePredicate = typePredicate;
     return this;
   }
 
-  replaceMethods(methodPredicate, replacement) {
-    this.replacements.set(methodPredicate, replacement);
+  methods(methodPredicate) {
+    this.methodPredicate = methodPredicate;
     return this;
+  }
+
+  replaceWith(replacement) {
+    this.replacement = replacement;
   }
 }
 
@@ -121,18 +127,19 @@ class AstBuilder extends Builder {
   }
 
   instrument() {
-    return new Ast(this.code, this.typePredicate, this.methodPredicate).instrument();
+    return new Ast(this.code, this.typePredicate, this.replacements).instrument();
   }
 }
 
 class Invocation {
-  constructor(method, args) {
+  constructor(method, args, context) {
     this.method = method;
     this.args = args;
+    this.context = context;
   }
 
   proceed() {
-    return this.method.apply(this, this.args);
+    return this.method.apply(this.context, this.args);
   }
 }
 
