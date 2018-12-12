@@ -1,5 +1,5 @@
-import { LoggerFactory, PatternAppender, Level } from "../src/log.js";
-import { ConsoleAppender } from "../src/log";
+import { LoggerFactory, PatternAppender, Level } from "../../src/util/log.js";
+import { ConsoleAppender } from "../../src/util/log";
 
 describe("The log facility works", () => {
   const logger = LoggerFactory.getRootLogger();
@@ -42,10 +42,16 @@ describe("The log facility works", () => {
     expect(items[0]).toContain(Level.ERROR.name);
   });
 
+  test("The pattern appender fails for unknown formats", () => {
+    expect(() => defaultAppender.pattern = '${unknown}').toThrow();
+  });
+
   test("The logger will log statements to the chosen appender", () => {
     logger.log(Level.ERROR, "Hello!");
-    expect(messages.length).toEqual(1);
+    logger.log(Level.ERROR, "Hello %s %s!", undefined, null);
+    expect(messages.length).toEqual(2);
     expect(messages[0]).toContain("Hello!");
+    expect(messages[1]).toContain("Hello undefined null!");
   });
 
   test("The logger can use %s as place holders", () => {
@@ -77,7 +83,7 @@ describe("The log facility works", () => {
     expect(messages[0]).toContain("Hello Manuel!");
   });
 
-  test("The logger can use {} with indexes as place holders", () => {
+  test("The logger can use %s with indexes as place holders", () => {
     logger.log(Level.ERROR, "Hello %1s %0s!", "Manuel", "Mr.");
     expect(messages.length).toEqual(1);
     expect(messages[0]).toContain("Hello Mr. Manuel!");
@@ -103,11 +109,11 @@ describe("The log facility works", () => {
 
   test("The new loggers can change its own pattern", () => {
     const customLogger = LoggerFactory.getLogger("custom");
-    customLogger.appender.pattern = "${message}";
+    customLogger.appender.pattern = "${message} !!!";
     customLogger.level = Level.ERROR;
-    customLogger.log(Level.ERROR, "Hello %1s %0s!", "Manuel", "Mr.");
+    customLogger.log(Level.ERROR, "Hello %1s %0s", "Manuel", "Mr.");
     expect(messages.length).toEqual(1);
-    expect(messages[0]).toEqual("Hello Mr. Manuel!");
+    expect(messages[0]).toEqual("Hello Mr. Manuel !!!");
   });
 
   test("The new loggers can change its own appender", () => {

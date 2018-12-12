@@ -5,7 +5,7 @@ function digestRegexp(regexp, message, callback) {
   while ((match = regexp.exec(message))) {
     result += message.substring(start, match.index);
     start = match.index + match[0].length;
-    result += callback(match);
+    result += callback(match, result);
   }
   if (start < message.length) {
     result += message.substring(start);
@@ -47,35 +47,52 @@ export class ConsoleAppender {
 export class PatternAppender {
   constructor(appender, pattern = "${level | justify 5} (${date | iso}) [${name | justify -32}]: ${message}") {
     this.appender = appender;
-    this._pattern = pattern;
+    this.pattern = pattern;
   }
 
   append(data) {
-    data.message = digestRegexp(/\$\{\s*(\w+)(?:\s*\|\s*([^\}]+))*\s*\}/g, this.pattern, match => {
-      const method = match[1];
-      let item = this[method](data);
-      if (match[2]) {
-        match[2]
-          .split("|")
-          .map(it => it.trim())
-          .forEach(pipe => {
-            const pipeArguments = pipe.split(" ").map(it => it.trim());
-            const pipeMethod = pipeArguments[0];
-            pipeArguments[0] = item;
-            item = this[pipeMethod].apply(this, pipeArguments);
-          });
-      }
-      return item;
+    let result = '',
+      start = 0;
+    this._patternPlaceHolders.forEach(ph => {
+      result += this._patternDigested.substring(start, ph.start);
+      start = ph.start;
+      let item = this[ph.method](data);
+      ph.pipes.forEach(pipe => {
+        const pipeArguments = pipe.args.slice();
+        pipeArguments.unshift(item);
+        const pipeMethod = pipe.method;
+        item = this[pipeMethod].apply(this, pipeArguments);
+      });
+      result += item;
     });
+    if (start < this._patternDigested.length) {
+      result += this._patternDigested.substring(start);
+    }
+    data.message = result;
     return this.appender.append(data);
   }
 
-  get pattern() {
-    return this._pattern;
-  }
-
   set pattern(pattern) {
-    this._pattern = pattern;
+    this._patternPlaceHolders = [];
+    this._patternDigested = digestRegexp(/\$\{\s*(\w+)(?:\s*\|\s*([^\}]+))*\s*\}/g, pattern, (match, result) => {
+      const method = match[1];
+      if (!this[method]) {
+        throw new Error(`Placeholder ${match[0]} not found in the appender`)
+      }
+      const ph = {start: result.length, method: method, pipes: []};
+      if (match[2]) {
+        ph.pipes = match[2]
+          .split("|")
+          .map(it => it.trim())
+          .map(pipe => {
+            const pipeArguments = pipe.split(" ").map(it => it.trim());
+            const pipeMethod = pipeArguments.shift();
+            return {method: pipeMethod, args: pipeArguments};
+          });
+      }
+      this._patternPlaceHolders.push(ph);
+      return '';
+    });
   }
 
   level(data) {
@@ -135,8 +152,6 @@ export class Logger {
               return value.toString();
             case 'j':
               return JSON.stringify(value);
-            default:
-              throw new Error(`Pattern "${format}" not recognized`);
           }
         });
       }

@@ -14,7 +14,6 @@ function getType(item) {
   }
 }
 
-
 export class Options {
   constructor(objectHandle, functionHandle) {
     this.objectHandle = objectHandle;
@@ -121,13 +120,6 @@ export class ObjectVisitor {
     const entry = context.peek();
     const target = entry.target;
     LOGGER.debug('_visitFunction');
-    context.options.functionHandle(target, entry.owner, entry.property);
-  }
-
-  _visitSymbol(context) {
-    const entry = context.peek();
-    const target = entry.target;
-    LOGGER.debug('_visitSymbol');
     context.options.functionHandle(target, entry.owner, entry.property);
   }
 }

@@ -1,3 +1,9 @@
-import jintrospector from "../jintrospector.js";
+import Aop from "../aop.js";
 
-export default jintrospector;
+export default class {
+
+  static forObject(object) {
+    return Aop.forObject(object);
+  }
+  
+};

@@ -1,7 +1,4 @@
-import {ObjectVisitor, Options} from "../src/visitor";
-import {Level, LoggerFactory} from "../src/log";
-
-LoggerFactory.getLogger('jintrospector.visitor').level = Level.ALL;
+import {ObjectVisitor, Options} from "../../src/util/visitor";
 
 describe("The visitor class works", () => {
 

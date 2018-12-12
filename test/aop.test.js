@@ -1,9 +1,9 @@
-import jinstrospector from "../src/jintrospector.js";
-import {Methods, Types} from "../src/predicate";
+import Aop from "../src/aop.js";
+import {Methods, Types} from "../src/util/predicate";
 
 describe("Creation of the interceptor", () => {
   test("The exported library is not null", () => {
-    expect(jinstrospector).not.toBeNull();
+    expect(Aop).not.toBeNull();
   });
 });
 
@@ -22,7 +22,7 @@ describe("AOP interceptor", () => {
     expect(target.sayHello.length).toEqual(1);
     expect(target.sayHello('Manuel')).toEqual("Hello Manuel Alvarez Alvarez");
 
-    jinstrospector
+    Aop
       .forObject(target)
       .types(Types.name('TestObject'))
       .methods(Methods.name('sayHello'))
@@ -46,7 +46,7 @@ describe("AOP interceptor", () => {
     expect(target.sayHello.length).toEqual(1);
     expect(target.sayHello('Manuel')).toEqual("Hello Manuel Alvarez Alvarez");
 
-    jinstrospector
+    Aop
       .forObject(target)
       .types(Types.name('TestObject'))
       .methods(Methods.name('sayHello'))
